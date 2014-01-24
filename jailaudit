@@ -1,0 +1,151 @@
+#!/bin/sh
+# copyright Philipp Wuensche
+# License: beer ware (http://en.wikipedia.org/wiki/Beerware)
+
+if [ ! -f /usr/local/sbin/portaudit ]; then
+    echo "Error: `basename $0 ` depends on portaudit"
+    exit
+fi
+
+if [ -f /usr/local/etc/jailaudit.conf ]; then
+    . /usr/local/etc/jailaudit.conf
+fi
+
+if [ "X${audit_path}" = "X" ]; then
+    audit_path=/usr/local/jailaudit/reports
+fi
+
+if [ "X${tmp_path}" = "X" ]; then
+    tmp_path=/usr/local/jailaudit/tmp
+fi
+
+if [ "X${hostname}" = "X" ]; then
+    hostname=`/bin/hostname`
+fi
+
+action=$1
+mailaddrs=$2
+jailnames=$3
+
+PRINT_USAGE () {
+    echo "Usage: `basename $0` <generate|mail> mailaddr \"jailnames\""
+    echo "        mailaddr can be \"-\" for stdout"
+    echo "        jailnames can be \"ALL\" for all audits or a list of jail-hostnames"
+}
+
+case ${action} in
+ generate)
+    JLS() {
+        /usr/sbin/jls | grep -v JID
+    }
+
+    echo
+    echo "Downloading a current audit database:"
+    /usr/local/sbin/portaudit -Fd
+
+    # use pkgng if it is available in the hostsystem
+    pkgng_bin='/usr/local/sbin/pkg'
+    if [ -x "${pkgng_bin}" ]; then
+     echo "pkgng support enabled, using ${pkgng_bin} version `${pkgng_bin} -v`."
+     PORTLIST_CMD () {
+      jexec ${jid} ls -1 /var/db/pkg/ |grep -v '.sqlite$' |grep -v 'auditfile'
+      ${pkgng_bin} -j ${jid} query -a '%n-%v'
+     }
+    else
+     PORTLIST_CMD () {
+      jexec ${jid} ls -1 /var/db/pkg/ |grep -v '.sqlite$' |grep -v 'auditfile'
+     }
+    fi
+
+    echo
+
+    rm -rf ${tmp_path}/*
+    rm -rf ${audit_path}/*
+    rm -f ${tmp_path}/_jailaudit_allports
+
+    for jid in `JLS|awk '{print $1}'`; do
+        PORTLIST_CMD >> ${tmp_path}/_jailaudit_allports 2> /dev/null
+    done
+
+    for portname in `cat ${tmp_path}/_jailaudit_allports|sort|uniq`; do
+        /usr/local/sbin/portaudit $portname > ${tmp_path}/_$portname 2> /dev/null
+    done
+
+    for jid in `JLS|awk '{print $1}'`; do
+        pcount=0
+        for portname in `PORTLIST_CMD`; do
+            if [ -f ${tmp_path}/_${portname} ]; then
+                if [ `grep -c '^0 problem(s) found.' ${tmp_path}/_${portname}` = 0 ]; then
+                    cat ${tmp_path}/_${portname}|grep -v "problem(s) found." >> $audit_path/$jid 2> /dev/null
+                    pcount=$((${pcount}+1))
+                fi
+            fi
+        done
+        echo "$pcount problem(s) found." >> $audit_path/$jid
+    done
+
+    cd $audit_path
+    JLS | awk '{print $1" "$3"_"$1}' | xargs -n2 mv
+    rm -rf ${tmp_path}/*
+    exit
+ ;;
+ mail)
+    # bail out if no jailnames and mailaddrs are given
+    [ -z "$jailnames" -o -z "$mailaddrs" ] && PRINT_USAGE && exit 1
+
+    rc=0
+    tmpfile=${tmp_path}/_audit-$mailaddr
+    rm -f $tmpfile
+
+    if [ "X$jailnames" = "XALL" ]; then
+        jailnames=`ls -1 $audit_path`
+    else
+	for jailname in ${jailnames}; do
+		_new_jailname=`ls -d1 ${audit_path}/${jailname}_*|sed s:${audit_path}/::g`
+		_jailnames="${_jailnames} ${_new_jailname}"
+	done
+	jailnames=${_jailnames}
+    fi
+
+    pcount=0
+     
+    for jailname in $jailnames; do
+
+        if [ -f $audit_path/$jailname ]; then
+            if [ `grep -c '^0 problem(s) found.' ${audit_path}/${jailname}` = 0 ]; then
+		tmpcount=`grep "problem(s) found." ${audit_path}/${jailname}|awk '{print $1}'`
+                pcount=`expr "$pcount" "+" "$tmpcount"`
+
+		jail_hostname=${jailname%%_*}
+		jid=${jailname##*_}
+
+                echo "" >> $tmpfile
+                echo "portaudit for jail: $jail_hostname (JID: ${jid})" >> $tmpfile
+                echo >> $tmpfile
+                cat ${audit_path}/${jailname} >> ${tmpfile}
+            fi
+        else
+            echo "" >> $tmpfile
+            echo "error: \"$jailname\" does not exist" >> $tmpfile
+        fi
+ 
+    done
+    
+    if [ -e ${tmpfile} ]; then
+        rc=1
+        if [ "X${mailaddrs}" = "X-" ]; then
+            echo "portaudit for jails on $hostname - $pcount problem(s) found."
+            cat $tmpfile
+        else
+            for mailaddr in ${mailaddrs}; do
+                cat $tmpfile |mail -s "portaudit for jails on $hostname - $pcount problem(s) found." $mailaddr
+            done
+        fi
+        rm -f $tmpfile
+    fi
+    exit $rc
+ ;;
+ *)
+  PRINT_USAGE && exit 1
+ ;;
+esac

@@ -1,0 +1,11 @@
+# sample jailaudit configuration
+
+# hostname of the system
+hostname=`hostname`
+
+# the path where the portaudit files will be stored
+audit_path=/usr/local/jailaudit/reports
+
+# path for temprary files
+tmp_path=/usr/local/jailaudit/tmp
+
