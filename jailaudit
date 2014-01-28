@@ -6,14 +6,17 @@ if [ -f /usr/local/sbin/portaudit ]; then
     command_name=portaudit
     audit_command=/usr/local/sbin/portaudit
     command_path=/usr/local/sbin/portaudit
+    vulnerability_regex='^0 problem(s) found.'
 elif [ -f /usr/sbin/pkg ]; then
     command_name=pkg
     audit_command='/usr/sbin/pkg audit'
     command_path=/usr/sbin/pkg
+    vulnerability_regex='is vulnerable'
 elif [ -f /usr/local/sbin/pkg ]; then
     command_name=pkg
     audit_command='/usr/local/sbin/pkg audit'
     command_path=/usr/local/sbin/pkg
+    vulnerability_regex='is vulnerable'
 else
     echo "Error: `basename $0 ` depends on ports-mgmt/portaudit and/or pkg(8)"
     exit
@@ -86,26 +89,17 @@ case ${action} in
     for jid in `JLS|awk '{print $1}'`; do
         pcount=0
         for portname in `PORTLIST_CMD`; do
-            if [ -f ${tmp_path}/_${portname} ]; then
-                case ${command_name} in
-                portaudit)
-                    if [ `grep -c '^0 problem(s) found.' ${tmp_path}/_${portname}` = 0 ]; then
-                        cat ${tmp_path}/_${portname}|grep -v "problem(s) found." >> $audit_path/$jid 2> /dev/null
-                        pcount=$((${pcount}+1))
-                    fi
-                ;;
-                pkg)
-                    if [ `grep -c 'is vulnerable' ${tmp_path}/_${portname}` = 1 ]; then
-                        cat ${tmp_path}/_${portname}|grep -v "problem(s) found." >> $audit_path/$jid 2> /dev/null
-                        pcount=$((${pcount}+1))
-                    fi
-                ;;
-                esac
+            if [ -s ${tmp_path}/_${portname} ]; then
+                if [ `grep -c '${vulnerability_regex}' ${tmp_path}/_${portname}` = 0 ]; then
+                    cat ${tmp_path}/_${portname}
+                    cat ${tmp_path}/_${portname}|grep -v "problem(s) found." >> $audit_path/$jid 2> /dev/null
+                    pcount=$((${pcount}+1))
+                fi
             fi
         done
         echo "$pcount problem(s) found." >> $audit_path/$jid
     done
-
+exit
     cd $audit_path
     JLS | awk '{print $1" "$3"_"$1}' | xargs -n2 mv
     rm -rf ${tmp_path}/*
