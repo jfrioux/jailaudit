@@ -18,7 +18,7 @@ elif [ -f /usr/local/sbin/pkg ]; then
     command_path=/usr/local/sbin/pkg
     vulnerability_regex='is vulnerable'
 else
-    echo "Error: `basename $0 ` depends on ports-mgmt/portaudit and/or pkg(8)"
+    echo "Error: `basename $0 ` depends on portaudit and/or pkg"
     exit
 fi
 
