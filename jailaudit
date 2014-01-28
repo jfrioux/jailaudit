@@ -2,17 +2,17 @@
 # copyright Philipp Wuensche
 # License: beer ware (http://en.wikipedia.org/wiki/Beerware)
 
-if [ -f /usr/local/sbin/portaudit ]; then
+if [ -x /usr/local/sbin/portaudit ]; then
     command_name=portaudit
     audit_command=/usr/local/sbin/portaudit
     command_path=/usr/local/sbin/portaudit
     vulnerability_regex='^0 problem(s) found.'
-elif [ -f /usr/sbin/pkg ]; then
+elif [ -x /usr/sbin/pkg ]; then
     command_name=pkg
     audit_command='/usr/sbin/pkg audit'
     command_path=/usr/sbin/pkg
     vulnerability_regex='is vulnerable'
-elif [ -f /usr/local/sbin/pkg ]; then
+elif [ -x /usr/local/sbin/pkg ]; then
     command_name=pkg
     audit_command='/usr/local/sbin/pkg audit'
     command_path=/usr/local/sbin/pkg
