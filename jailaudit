@@ -2,12 +2,7 @@
 # copyright Philipp Wuensche
 # License: beer ware (http://en.wikipedia.org/wiki/Beerware)
 
-if [ -x /usr/local/sbin/portaudit ]; then
-    command_name=portaudit
-    audit_command=/usr/local/sbin/portaudit
-    command_path=/usr/local/sbin/portaudit
-    vulnerability_regex='^0 problem(s) found.'
-elif [ -x /usr/sbin/pkg ]; then
+if [ -x /usr/sbin/pkg ]; then
     command_name=pkg
     audit_command='/usr/sbin/pkg audit'
     command_path=/usr/sbin/pkg
@@ -17,6 +12,11 @@ elif [ -x /usr/local/sbin/pkg ]; then
     audit_command='/usr/local/sbin/pkg audit'
     command_path=/usr/local/sbin/pkg
     vulnerability_regex='is vulnerable'
+elif [ -x /usr/local/sbin/portaudit ]; then
+    command_name=portaudit
+    audit_command=/usr/local/sbin/portaudit
+    command_path=/usr/local/sbin/portaudit
+    vulnerability_regex='^0 problem(s) found.'
 else
     echo "Error: `basename $0 ` depends on portaudit and/or pkg"
     exit
@@ -99,7 +99,7 @@ case ${action} in
         done
         echo "$pcount problem(s) found." >> $audit_path/$jid
     done
-exit
+    
     cd $audit_path
     JLS | awk '{print $1" "$3"_"$1}' | xargs -n2 mv
     rm -rf ${tmp_path}/*
@@ -116,25 +116,24 @@ exit
     if [ "X$jailnames" = "XALL" ]; then
         jailnames=`ls -1 $audit_path`
     else
-	for jailname in ${jailnames}; do
-		_new_jailname=`ls -d1 ${audit_path}/${jailname}_*|sed s:${audit_path}/::g`
-		_jailnames="${_jailnames} ${_new_jailname}"
-	done
-	jailnames=${_jailnames}
+	    for jailname in ${jailnames}; do
+	    	_new_jailname=`ls -d1 ${audit_path}/${jailname}_*|sed s:${audit_path}/::g`
+	    	_jailnames="${_jailnames} ${_new_jailname}"
+	    done
+	    jailnames=${_jailnames}
     fi
-
+    
     pcount=0
-     
+    
     for jailname in $jailnames; do
-
         if [ -f $audit_path/$jailname ]; then
             if [ `grep -c '^0 problem(s) found.' ${audit_path}/${jailname}` = 0 ]; then
-		tmpcount=`grep "problem(s) found." ${audit_path}/${jailname}|awk '{print $1}'`
+		        tmpcount=`grep "problem(s) found." ${audit_path}/${jailname}|awk '{print $1}'`
                 pcount=`expr "$pcount" "+" "$tmpcount"`
 
-		jail_hostname=${jailname%%_*}
-		jid=${jailname##*_}
-
+		        jail_hostname=${jailname%%_*}
+		        jid=${jailname##*_}
+		
                 echo "" >> $tmpfile
                 echo "portaudit for jail: $jail_hostname (JID: ${jid})" >> $tmpfile
                 echo >> $tmpfile
