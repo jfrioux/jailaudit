@@ -49,7 +49,7 @@ PRINT_USAGE () {
 }
 
 case ${action} in
- generate)
+ generatgit statuse)
     JLS() {
         /usr/sbin/jls | grep -v JID
     }
@@ -63,14 +63,14 @@ case ${action} in
 
     case ${command_name} in
     portaudit)
-        `${command_path} -Fd`
+        ${command_path} -Fd
 
         PORTLIST_CMD () {
             jexec ${jid} ls -1 /var/db/pkg/ |grep -v '.sqlite$' |grep -v 'auditfile'
-        }
+        }               
     ;;
     pkg)
-        `${audit_command} -F`
+        ${audit_command} -F
         echo "pkgng support enabled, using ${command_path}  version `${command_path} -v`."
         PORTLIST_CMD () {
             ${command_path} -j ${jid} query -a '%n-%v'
@@ -81,7 +81,7 @@ case ${action} in
     for jid in `JLS|awk '{print $1}'`; do
         PORTLIST_CMD >> ${tmp_path}/_jailaudit_allports 2> /dev/null
     done
-
+    
     for portname in `cat ${tmp_path}/_jailaudit_allports|sort|uniq`; do
         ${audit_command} $portname > ${tmp_path}/_$portname 2> /dev/null
     done
@@ -91,12 +91,12 @@ case ${action} in
         for portname in `PORTLIST_CMD`; do
             if [ -s ${tmp_path}/_${portname} ]; then
                 if [ `grep -c '${vulnerability_regex}' ${tmp_path}/_${portname}` = 0 ]; then
-                    cat ${tmp_path}/_${portname}
                     cat ${tmp_path}/_${portname}|grep -v "problem(s) found." >> $audit_path/$jid 2> /dev/null
                     pcount=$((${pcount}+1))
                 fi
             fi
         done
+        
         echo "$pcount problem(s) found." >> $audit_path/$jid
     done
     
@@ -164,4 +164,3 @@ case ${action} in
   PRINT_USAGE && exit 1
  ;;
 esac
-
