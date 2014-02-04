@@ -49,7 +49,7 @@ PRINT_USAGE () {
 }
 
 case ${action} in
- generatgit statuse)
+ generate)
     JLS() {
         /usr/sbin/jls | grep -v JID
     }
